@@ -1,5 +1,8 @@
 <?php
-    require_once __DIR__ . '/auth_guard.php';
+    session_start();
+    if (!$_SESSION['is_logged']) {
+        header("Location: login.php?redirect=monthwise_list");
+    }
 
     $page_title = "Monthwise FD List";
     include("header.php");
@@ -16,22 +19,22 @@
     $sort_link = '';
 
     if (isset($_GET['name']) && $_GET['name']) {
-        $name = (int) trim($_GET['name']); // integer-validated (S1)
+        $name = trim($_GET['name']);
         $search_query .= " and a.name = $name";
         $sort_link .= "&name=$name";
     }
     if (isset($_GET['deposite_scheme']) && $_GET['deposite_scheme']) {
-        $deposite_scheme = (int) trim($_GET['deposite_scheme']); // integer-validated (S1)
+        $deposite_scheme = trim($_GET['deposite_scheme']);
         $search_query .= " and deposite_scheme = '$deposite_scheme'";
         $sort_link .= "&deposite_scheme=$deposite_scheme";
     }
     if (isset($_GET['deposited_on']) && $_GET['deposited_on']) {
-        $deposited_on = (int) trim($_GET['deposited_on']); // integer-validated (S1)
+        $deposited_on = trim($_GET['deposited_on']);
         $search_query .= " and (month(deposite_date) = '$deposited_on' or month(renewal_date) = '$deposited_on')";
         $sort_link .= "&deposited_on=$deposited_on";
     }
     if (isset($_GET['matured_on']) && $_GET['matured_on']) {
-        $matured_on = (int) trim($_GET['matured_on']); // integer-validated (S1)
+        $matured_on = trim($_GET['matured_on']);
         $search_query .= " and month(maturity_date) = '$matured_on'";
         $sort_link .= "&matured_on=$matured_on";
     }
@@ -39,7 +42,7 @@
     $order_by = 'maturity_date';
     $ord = 0;
     if (isset($_GET['ord'])) {
-        $ord = (int) $_GET['ord'];
+        $ord = $_GET['ord'];
 
         switch ($ord) {
             default:
@@ -79,7 +82,7 @@
     $ot = 1;
     $new_ot = 1;
     if (isset($_GET['ot'])) {
-        $ot = (int) $_GET['ot'];
+        $ot = $_GET['ot'];
 
         if ($ot == 0) {
             $order_type = 'desc';
@@ -313,9 +316,9 @@
                 <td align="right"><?php echo date("d-m-Y", strtotime($row->deposite_date)) ?></td>
                 <td align="right"><?php echo date("d-m-Y", strtotime($row->renewal_date)) ?></td>
                 <td align="right"><?php echo date("d-m-Y", strtotime($row->maturity_date)) ?></td>
-                <td align="right"><?php echo number_format($row->rate_of_interest, 2)?>%</td>
-                <td align="right"><?php echo number_format($row->deposite_amount, 2) ?></td>
-                <td align="right"><?php echo number_format($row->total_interest, 2) ?></td>
+                <td align="right"><?php echo $fmt->format($row->rate_of_interest)?>%</td>
+                <td align="right"><?php echo $fmt->format($row->deposite_amount) ?></td>
+                <td align="right"><?php echo $fmt->format($row->total_interest) ?></td>
                 <td align="right">
                     <?php
                         if (strtotime($row->maturity_date) <= strtotime('now')) {
@@ -328,7 +331,7 @@
                                 $row->maturity_date
                             );
                         }
-                        echo number_format($int_till_date, 2);
+                        echo $fmt->format($int_till_date);
                         $total_cur_interest_amount += $int_till_date;
                         $namewise_cur_interest_amount += $int_till_date;
                     ?>
@@ -338,10 +341,10 @@
                         $cur_value = $row->deposite_amount + $int_till_date;
                         $total_cur_value += $cur_value;
                         $namewise_cur_value += $cur_value;
-                        echo number_format($cur_value, 2);
+                        echo $fmt->format($cur_value);
                     ?>
                 </td>
-                <td align="right"><?php echo number_format($row->maturity_amount, 2) ?></td>
+                <td align="right"><?php echo $fmt->format($row->maturity_amount) ?></td>
                 <td align="left">
                     <?php echo $renew_txt ?> <a href="edit_fd.php?fdid=<?php echo $row->id?>">Edit</a> | <a href="delete_fd.php?fdid=<?php echo $row->id?>" onclick="return confirm('Are you sure to delete this FD?')">Delete</a>
                 </td>
@@ -351,11 +354,11 @@
 ?>
             <tr>
                 <th colspan="8">Total</th>
-                <th align="right"><?php echo number_format($namewise_deposite_amount, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_interest_amount, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_cur_interest_amount, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_cur_value, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_matured_amount, 2)?></th>
+                <th align="right"><?php echo $fmt->format($namewise_deposite_amount) ?></th>
+                <th align="right"><?php echo $fmt->format($namewise_interest_amount) ?></th>
+                <th align="right"><?php echo $fmt->format($namewise_cur_interest_amount) ?></th>
+                <th align="right"><?php echo $fmt->format($namewise_cur_value) ?></th>
+                <th align="right"><?php echo $fmt->format($namewise_matured_amount)?></th>
                 <th>&nbsp;</th>
             </tr>
 <?php
@@ -365,11 +368,11 @@
 ?>
     <tr>
         <th colspan="8">Final Total</th>
-        <th align="right"><?php echo number_format($total_deposite_amount, 2) ?></th>
-        <th align="right"><?php echo number_format($total_interest_amount, 2) ?></th>
-        <th align="right"><?php echo number_format($total_cur_interest_amount, 2) ?></th>
-        <th align="right"><?php echo number_format($total_cur_value, 2) ?></th>
-        <th align="right"><?php echo number_format($total_matured_amount, 2)?></th>
+        <th align="right"><?php echo $fmt->format($total_deposite_amount) ?></th>
+        <th align="right"><?php echo $fmt->format($total_interest_amount) ?></th>
+        <th align="right"><?php echo $fmt->format($total_cur_interest_amount) ?></th>
+        <th align="right"><?php echo $fmt->format($total_cur_value) ?></th>
+        <th align="right"><?php echo $fmt->format($total_matured_amount)?></th>
         <th>&nbsp;</th>
     </tr>
 </table>

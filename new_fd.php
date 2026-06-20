@@ -1,8 +1,5 @@
 <?php
-    session_start();
-    if (!$_SESSION['is_logged']) {
-        header("Location: login.php?redirect=new_fd");
-    }
+    require_once __DIR__ . '/auth_guard.php';
 
     include_once("db_connect.php");
 
@@ -28,6 +25,13 @@
         $payouts = array($start_date->format('Y-m-d'), $end_date->format('Y-m-d'), $interest);
 
         return $payouts;
+    }
+
+    // Parameterized INSERT into accounts (prevents SQL injection, S1).
+    function add_account($db, $name, $deposite_scheme, $deposite_date, $renewal_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, $total_interest, $maturity_amount, $is_active, $ref_id) {
+        $sql = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date, rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $res = $db->execute($sql, str_repeat('s', 14), [$name, $deposite_scheme, $deposite_date, $renewal_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, $total_interest, $maturity_amount, $is_active, $ref_id]);
+        return $res ? $res['insert_id'] : false;
     }
 
     $db = new db();
@@ -143,18 +147,12 @@
         if ($is_valid) {
             $is_active = 1;
 
-            if ($deposite_type == 1 or $deposite_type == 2) {
+            if ($deposite_type == 1 or $deposite_type == 2 or $deposite_type == 3) {
                 // Create FD interest payout rows for each quarter
                 // 1. Main row for create date, close date, amount and maturity amount, inital amount = maturity amount
                 // 2. Calculate interet for every quarter and add separare row
-                echo "is im here?";
                 $name = ucwords(strtolower($name));
-                echo $add_fd_query = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date,
-                rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values(
-                '$name', '$deposite_scheme', '$deposite_date', '$deposite_date', '$period', '$period_type', '$maturity_date',
-                '$rate_of_interest', $interest_type, '$deposite_amount', 0, '$deposite_amount', '$is_active', '$account_id-PRI')";
-
-                $fs_id = $db->insert_query($add_fd_query);
+                $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $deposite_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, 0, $deposite_amount, $is_active, "$account_id-PRI");
 
                 if ($deposite_type == 1) {
                     $interval = new DateInterval('P1M');
@@ -164,30 +162,49 @@
                     $payout_part = 1;
                     while (True) {
                         $date1 = clone $renewal_date;
-                        $date2 = $renewal_date->add($interval);;
-                        echo $end >= $date2;
+                        $date2 = $renewal_date->add($interval);
+                        // echo $end >= $date2;
                         if ($end < $date2) {
                             break;
                         }
                         $payout = calculateMonthlyPayout($date1, $date2, $deposite_amount, $rate_of_interest);
-                        $add_fd_query = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date,
-                        rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values(
-                        '$name', '$deposite_scheme', '$deposite_date', '$payout[0]', '$period', '$period_type', '$payout[1]',
-                        '$rate_of_interest', $interest_type, 0, $payout[2], $payout[2], '$is_active', '$account_id-M$payout_part')";
-
-                        $fs_id = $db->insert_query($add_fd_query);
+                        $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $payout[0], $period, $period_type, $payout[1], $rate_of_interest, $interest_type, 0, $payout[2], $payout[2], $is_active, "$account_id-M$payout_part");
                         $payout_part++;
                     }
 
                     if ($end != $renewal_date and $end != $date1) {
                         $payout = calculateMonthlyPayout($date1, $end, $deposite_amount, $rate_of_interest);
 
-                        $add_fd_query = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date,
-                        rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values(
-                        '$name', '$deposite_scheme', '$deposite_date', '$payout[0]', '$period', '$period_type', '$payout[1]',
-                        '$rate_of_interest', $interest_type, 0, $payout[2], $payout[2], '$is_active', '$account_id-M$payout_part')";
+                        $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $payout[0], $period, $period_type, $payout[1], $rate_of_interest, $interest_type, 0, $payout[2], $payout[2], $is_active, "$account_id-M$payout_part");
 
-                        $fs_id = $db->insert_query($add_fd_query);
+                    }
+                } else if ($deposite_type == 3) {
+                    $interval = new DateInterval('P1M');
+                    $end = new DateTime($maturity_date);
+
+                    $renewal_date = new DateTime($deposite_date);
+                    $payout_part = 1;
+                    while (True) {
+                        $date1 = clone $renewal_date;
+                        $date2 = $renewal_date->add($interval);
+                        // replace $date2 day as 1st
+                        $date2->setDate($date2->format('Y'), $date2->format('m'), 1);
+
+                        // minus 1 day
+                        $date2->sub(new DateInterval('P1D'));
+
+                        if ($end < $date2) {
+                            break;
+                        }
+                        $payout = calculateMonthlyPayout($date1, $date2, $deposite_amount, $rate_of_interest);
+                        $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $payout[0], $period, $period_type, $payout[1], $rate_of_interest, $interest_type, 0, $payout[2], $payout[2], $is_active, "$account_id-M$payout_part");
+                        $payout_part++;
+                    }
+
+                    if ($end != $renewal_date and $end != $date1) {
+                        $payout = calculateMonthlyPayout($date1, $end, $deposite_amount, $rate_of_interest);
+
+                        $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $payout[0], $period, $period_type, $payout[1], $rate_of_interest, $interest_type, 0, $payout[2], $payout[2], $is_active, "$account_id-M$payout_part");
 
                     }
                 } else {
@@ -198,39 +215,24 @@
                     $payout_part = 1;
                     while (True) {
                         $date1 = clone $renewal_date;
-                        $date2 = $renewal_date->add($interval);;
+                        $date2 = $renewal_date->add($interval);
                         if ($end < $date2) {
                             break;
                         }
                         $payout = calculateQueartlyPayout($date1, $date2, $deposite_amount, $rate_of_interest);
-                        $add_fd_query = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date,
-                        rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values(
-                        '$name', '$deposite_scheme', '$deposite_date', '$payout[0]', '$period', '$period_type', '$payout[1]',
-                        '$rate_of_interest', $interest_type, 0, $payout[2], $payout[2], '$is_active', '$account_id-Q$payout_part')";
-
-                        $fs_id = $db->insert_query($add_fd_query);
+                        $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $payout[0], $period, $period_type, $payout[1], $rate_of_interest, $interest_type, 0, $payout[2], $payout[2], $is_active, "$account_id-Q$payout_part");
                         $payout_part++;
                     }
 
                     if ($end != $renewal_date and $end != $date1) {
                         $payout = calculateQueartlyPayout($date1, $end, $deposite_amount, $rate_of_interest);
 
-                        $add_fd_query = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date,
-                        rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values(
-                        '$name', '$deposite_scheme', '$deposite_date', '$payout[0]', '$period', '$period_type', '$payout[1]',
-                        '$rate_of_interest', $interest_type, 0, $payout[2], $payout[2], '$is_active', '$account_id-Q$payout_part')";
-
-                        $fs_id = $db->insert_query($add_fd_query);
+                        $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $payout[0], $period, $period_type, $payout[1], $rate_of_interest, $interest_type, 0, $payout[2], $payout[2], $is_active, "$account_id-Q$payout_part");
                     }
                 }
             } else {
                 $name = ucwords(strtolower($name));
-                $add_fd_query = "insert into accounts (name, deposite_scheme, deposite_date, renewal_date, period, period_type, maturity_date,
-                rate_of_interest, interest_type, deposite_amount, total_interest, maturity_amount, is_active, ref_id) values(
-                '$name', '$deposite_scheme', '$deposite_date', '$deposite_date', '$period', '$period_type', '$maturity_date',
-                '$rate_of_interest', $interest_type, '$deposite_amount', '$total_interest', '$maturity_amount', '$is_active', '$account_id')";
-                //echo $add_fd_query;
-                $fs_id = $db->insert_query($add_fd_query);
+                $fs_id = add_account($db, $name, $deposite_scheme, $deposite_date, $deposite_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, $total_interest, $maturity_amount, $is_active, "$account_id");
             }
 
 			if ($fs_id) {
@@ -323,6 +325,7 @@
                 <option value=""></option>
                 <option value="0" <?php if ($deposite_type == "0") echo "selected"?>>Cumulative</option>
                 <option value="1" <?php if ($deposite_type == "1") echo "selected"?>>Interest Payout Monthly</option>
+                <option value="1" <?php if ($deposite_type == "3") echo "selected"?>>Interest Payout Monthly (on Month End)</option>
                 <option value="2" <?php if ($deposite_type == "2") echo "selected"?>>Interest Payout Queartly</option>
             </select>
             <?php echo $deposite_type_msg ?></td>

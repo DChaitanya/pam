@@ -1,9 +1,6 @@
 <?php
     error_reporting(E_ERROR);
-    session_start();
-    if (!$_SESSION['is_logged']) {
-        header("Location: login.php?redirect=index");
-    }
+    require_once __DIR__ . '/auth_guard.php';
 
     $page_title = "Investment Report";
     include("header.php");
@@ -100,7 +97,7 @@
     while($rs_row = mysqli_fetch_object($get_result_rs)) {
         $userwise_drilldown_agg .= "{name: '$rs_row->name', y: $rs_row->deposite_amount, drilldown: '$rs_row->name'},";
         
-        $get_result_rs2 = $db->query("SELECT scheme_name, deposite_amount FROM scheme_wise_details_active where name='$rs_row->name'") ;
+        $get_result_rs2 = $db->select("SELECT scheme_name, deposite_amount FROM scheme_wise_details_active where name = ?", "s", [$rs_row->name]) ;
         $userwise_drilldown_details .= "{name: '$rs_row->name', id: '$rs_row->name', data:[";
         while($rs_row2 = mysqli_fetch_object($get_result_rs2)) {
             $userwise_drilldown_details .= "['$rs_row2->scheme_name', $rs_row2->deposite_amount],";

@@ -49,5 +49,5 @@
 date_default_timezone_set('Asia/Kolkata');
 setlocale(LC_MONETARY, "hi_IN.ISCII-DEV");
 // $fmt = new NumberFormatter('en_IN', NumberFormatter::CURRENCY);
-// $fmt = new NumberFormatter('en_IN', NumberFormatter::DECIMAL);
-// $fmt->setAttribute($fmt::FRACTION_DIGITS, 2); //applies rounding during format
+$fmt = new NumberFormatter('en_IN', NumberFormatter::DECIMAL);
+$fmt->setAttribute($fmt::FRACTION_DIGITS, 2); //applies rounding during format

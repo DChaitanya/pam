@@ -1,52 +1,77 @@
 <?php
+    session_set_cookie_params([
+        'httponly' => true,
+        'samesite' => 'Lax',
+        // 'secure' => true,  // enable once always served over HTTPS
+    ]);
     session_start();
 
-    if (isset($_SESSION['is_logged']) && $_SESSION['is_logged']) {
+    if (!empty($_SESSION['is_logged'])) {
         header("Location: index.php");
+        exit;
     }
 
-    $file = 'login_log.txt';
-    
-    #file_put_contents($file, "Start of login page\n", FILE_APPEND);
     $error_msg = '';
     if (isset($_POST['login'])) {
-        #file_put_contents($file, "Post Request Found\n", FILE_APPEND);
-        $redirect = "index";
+        // Keep the redirect target a local script name (prevents open redirect).
+        $redirect = 'index';
         if (isset($_GET['redirect'])) {
-            $redirect = $_GET['redirect'];
+            $redirect = preg_replace('/[^A-Za-z0-9_]/', '', $_GET['redirect']);
         }
-        $username = $_POST['username'];
-        $password = $_POST['password'];
+        if ($redirect === '') {
+            $redirect = 'index';
+        }
+
+        $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+        $password = isset($_POST['password']) ? (string) $_POST['password'] : '';
 
         include_once("db_connect.php");
-        $user_query = "select firstname, lastname, is_super from auth_users where is_active = '1' and username='$username' and password=sha1('$password')";
-
         $db = new db();
-        $user_rs = $db->query($user_query);
 
-        if (mysqli_num_rows($user_rs)) {
-            session_start();
+        // Parameterized query — user input is bound, never interpolated (S1).
+        $user_rs = $db->select(
+            "select firstname, lastname, is_super, password from auth_users where is_active = '1' and username = ?",
+            "s",
+            [$username]
+        );
 
+        $authenticated = false;
+        $user_rec = null;
+        if ($user_rs && mysqli_num_rows($user_rs)) {
             $user_rec = mysqli_fetch_object($user_rs);
-            $firstname = $user_rec->firstname;
-            $lastname = $user_rec->lastname;
-            $is_super = $user_rec->is_super;
+            $stored = (string) $user_rec->password;
 
-            $_SESSION['firstname'] = $firstname;
-            $_SESSION['lastname'] = $lastname;
-            $_SESSION['is_super'] = $is_super;
+            if (preg_match('/^[0-9a-f]{40}$/i', $stored)) {
+                // Legacy unsalted SHA1: verify, then transparently upgrade to bcrypt (S3).
+                if (hash_equals(strtolower($stored), sha1($password))) {
+                    $authenticated = true;
+                    $new_hash = password_hash($password, PASSWORD_DEFAULT);
+                    $db->execute(
+                        "update auth_users set password = ? where username = ?",
+                        "ss",
+                        [$new_hash, $username]
+                    );
+                }
+            } else {
+                // Modern bcrypt/argon2 hash.
+                $authenticated = password_verify($password, $stored);
+            }
+        }
+
+        if ($authenticated && $user_rec) {
+            session_regenerate_id(true); // prevent session fixation
+
+            $_SESSION['firstname'] = $user_rec->firstname;
+            $_SESSION['lastname']  = $user_rec->lastname;
+            $_SESSION['is_super']  = $user_rec->is_super;
             $_SESSION['is_logged'] = true;
-            
-            #file_put_contents($file, "User is Validated... trying to redirect to $redirect\n", FILE_APPEND);
 
             header("Location: $redirect.php");
-
+            exit;
         } else {
-            #file_put_contents($file, "User validation failed\n", FILE_APPEND);
             $error_msg = "Invalid Username or Password.";
         }
     }
-    #file_put_contents($file, "Get Request Found\n", FILE_APPEND);
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
