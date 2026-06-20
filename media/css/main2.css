@@ -1,0 +1,102 @@
+@charset "utf-8";
+/* CSS Document */
+
+body {
+    width:100%;
+    height:auto;
+    margin:0px 0 0;
+    padding:0;
+    float:left;
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:12px;
+    color:#000;
+}
+#center {
+    height:auto;
+    margin:0 auto;
+    width:960px;
+}
+#header {
+    width:100%;
+    height:auto;
+    float:center;
+    position:relative;
+}
+#main-content {
+    width:100%;
+    height:auto;
+    float:left;
+}
+#error-messages
+{
+    text-align:center;
+    font-size:14px;
+    color:#FF0000;
+}
+#sitemap
+{
+    width:100%;
+    height:auto;
+    float:left;
+    font-size:13px;
+}
+#footer
+{
+    width:100%;
+    height:auto;
+    float:left;
+    text-align:center;
+    font-size:12px;
+}
+#login
+{
+    padding: 180px;
+}
+#add_fd_frm {
+    width: 100%;
+    height: auto;
+}
+.fdlst
+table {
+    width: 955px;
+}
+.fdlst
+table th,
+table td {
+    border: 0px solid #FFFFFF;
+    padding: 2px;
+}
+.fdlst
+table th {
+    background-color: #6C8EA1;
+    color: #FFFFFF;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.fdlst_odd {
+    background-color: #E5EDF1;
+}
+.fdlst_even {
+    background-color: #F5F8F9;
+}
+a
+{
+    color:#0d770c;
+    text-decoration:none;
+}
+a:hvoer
+{
+    color:#005295;
+}
+a:active
+{
+    text-decoration:underline;
+}
+.errorlist li {
+    color: #FF0000;
+    display: block;
+    font-size: 12px !important;
+    list-style: none;
+    float:left;
+    padding:0px 10px 0px 10px;
+}

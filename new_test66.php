@@ -384,9 +384,9 @@
                 <td align="right"><?php echo date("d-m-Y", strtotime($row->deposite_date)) ?></td>
                 <td align="right"><?php echo date("d-m-Y", strtotime($row->renewal_date)) ?></td>
                 <td align="right"><?php echo date("d-m-Y", strtotime($row->maturity_date)) ?></td>
-                <td align="right"><?php echo number_format(($row->rate_of_interest, 2)?>%</td>
-                <td align="right"><?php echo number_format(($row->deposite_amount, 2, '.', ',') ?></td>
-                <td align="right"><?php echo number_format(($row->total_interest, 2, '.', ',') ?></td>
+                <td align="right"><?php echo number_format($row->rate_of_interest, 2)?>%</td>
+                <td align="right"><?php echo number_format($row->deposite_amount, 2, '.', ',') ?></td>
+                <td align="right"><?php echo number_format($row->total_interest, 2, '.', ',') ?></td>
                 <td align="right">
                     <?php
                         if (strtotime($row->maturity_date) <= strtotime($interest_on_date)) {
@@ -400,7 +400,7 @@
                                 $interest_on_date
                             );
                         }
-                        echo number_format(($int_till_date, 2, '.', ',');
+                        echo number_format($int_till_date, 2, '.', ',');
                         $total_cur_interest_amount += $int_till_date;
                     ?>
                 </td>
@@ -408,10 +408,10 @@
                     <?php
                         $cur_value = $row->deposite_amount + $int_till_date;
                         $total_cur_value += $cur_value;
-                        echo number_format(($cur_value, 2, '.', ',');
+                        echo number_format($cur_value, 2, '.', ',');
                     ?>
                 </td>
-                <td align="right"><?php echo number_format(($row->maturity_amount, 2, '.', ',') ?></td>
+                <td align="right"><?php echo number_format($row->maturity_amount, 2, '.', ',') ?></td>
                 <td align="left">
                     <?php echo $renew_txt ?> <a href="edit_fd.php?fdid=<?php echo $row->id?>">Edit</a> | <a href="delete_fd.php?fdid=<?php echo $row->id ?>">Delete</a>
                 </td>
@@ -422,11 +422,11 @@
 ?>
     <tr>
         <th colspan="8">Total</th>
-        <th align="right"><?php echo number_format(($total_deposite_amount, 2, '.', ',') ?></th>
-        <th align="right"><?php echo number_format(($total_interest_amount, 2, '.', ',') ?></th>
-        <th align="right"><?php echo number_format(($total_cur_interest_amount, 2, '.', ',') ?></th>
-        <th align="right"><?php echo number_format(($total_cur_value, 2, '.', ',') ?></th>
-        <th align="right"><?php echo number_format(($total_matured_amount, 2, '.', ',')?></th>
+        <th align="right"><?php echo number_format($total_deposite_amount, 2, '.', ',') ?></th>
+        <th align="right"><?php echo number_format($total_interest_amount, 2, '.', ',') ?></th>
+        <th align="right"><?php echo number_format($total_cur_interest_amount, 2, '.', ',') ?></th>
+        <th align="right"><?php echo number_format($total_cur_value, 2, '.', ',') ?></th>
+        <th align="right"><?php echo number_format($total_matured_amount, 2, '.', ',')?></th>
         <th>&nbsp;</th>
     </tr>
 </table>

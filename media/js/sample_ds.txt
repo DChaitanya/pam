@@ -1,0 +1,33 @@
+nohup hive -e "select distinct file_sha2 from rrslog.rrslog where server_date between '2016-05-01' and '2016-05-03' distribute by rand() sort by rand() limit 1000" > file_sha2.rrslog.txt 2>&1 &
+nohup hive -e "select distinct hex(file_sha2) from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_sha2.avping.txt 2> file_sha2_avping_log &
+nohup hive -e "select distinct file_sha2 from bashsub.submission where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_sha2.bashsub.txt 2> file_sha2_bashsub_log &
+
+nohup hive -e "select distinct file_md5 from rrslog.rrslog where server_date between '2016-05-01' and '2016-05-03' distribute by rand() sort by rand() limit 1000" > file_md5.rrslog.txt 2> file_md5_rrslog_log &
+nohup hive -e "select distinct hex(file_md5) from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_md5.avping.txt 2> file_md5_avping_log &
+nohup hive -e "select distinct file_md5 from bashsub.submission where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_md5.bashsub.txt 2> file_md5_bashsub_log &
+nohup hive -e "select distinct hex(portal_file_md5) from ipsping.ipsping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_md5.ipsping.txt 2> file_md5_ipsping_log &
+
+nohup hive -e "select distinct url from rrslog.rrslog where server_date between '2016-05-01' and '2016-05-03' distribute by rand() sort by rand() limit 1000" > url.rrslog.txt 2> url_rrslog_log &
+nohup hive -e "select distinct intrusion_url from ipsping.ipsping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > url.ipsping.txt 2> url_ipsping_log &
+nohup hive -e "select distinct conviction_url from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > url.avping.txt 2> url_avping_log &
+
+nohup hive -e "select distinct machine_guid from rrslog.rrslog where server_date between '2016-05-01' and '2016-05-03' distribute by rand() sort by rand() limit 1000" > machine_guid.rrslog.txt 2> machine_guid_rrslog_log &
+nohup hive -e "select distinct hex(machine_guid) from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > machine_guid.avping.txt 2> machine_guid_avping_log &
+nohup hive -e "select distinct machine_guid from bashsub.submission where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > machine_guid.bashsub.txt 2> machine_guid_bashsub_log &
+nohup hive -e "select distinct hex(machine_guid) from ipsping.ipsping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > machine_guid.ipsping.txt 2> machine_guid_ipsping_log &
+
+nohup hive -e "select distinct signature_id from ipsping.ipsping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > signature_id.ipsping.txt 2> signature_id_ipsping_log &
+
+nohup hive -e "select distinct CASE WHEN attacker_local_remote = 2 THEN local_ip WHEN attacker_local_remote = 1 THEN remote_ip ELSE NULL END AS from ipsping.ipsping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > ip.ipsping.txt 2> ip_ipsping_log &
+
+nohup hive -e "select distinct virus_name from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > virusname.avping.txt 2> virus_name_avping_log &
+nohup hive -e "select distinct virus_name from bashsub.submission where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > virusname.bashsub.txt 2> virus_name_bashsub_log &
+
+nohup hive -e "select distinct filename from rrslog.rrslog where server_date between '2016-05-01' and '2016-05-03' distribute by rand() sort by rand() limit 1000" > filename.rrslog.txt 2> filename_rrslog_log &
+nohup hive -e "select distinct filename from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > filename.avping.txt 2> filename_avping_log &
+nohup hive -e "select distinct filename from bashsub.submission where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > filename.bashsub.txt 2> filename_bashsub_log &
+
+nohup hive -e "select distinct file_directory from rrslog.rrslog where server_date between '2016-05-01' and '2016-05-03' distribute by rand() sort by rand() limit 1000" > file_path.rrslog.txt 2> file_path_rrslog_log &
+nohup hive -e "select distinct raw_file_directory from avping.avping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_path.avping.txt 2> file_path_avping_log &
+nohup hive -e "select distinct raw_file_directory from bashsub.submission where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_path.bashsub.txt 2> file_path_bashsub_log &
+nohup hive -e "select distinct portal_file_directory from ipsping.ipsping where server_date between '2016-05-01' and '2016-05-31' distribute by rand() sort by rand() limit 1000" > file_path.ipsping.txt 2> file_path_ipsping_log &

@@ -1,22 +1,25 @@
 <?php
-require_once __DIR__ . '/auth_guard.php';
 
+session_start();
+if (!$_SESSION['is_logged']) {
+    header("Location: login.php?redirect=delete_fd");
+}
 // set the default timezone as 'Asia/Calcutta';
 date_default_timezone_set('Asia/Kolkata');
+
 
 include_once("db_connect.php");
 
 $db = new db();
 
-$fd_id = isset($_REQUEST["fdid"]) ? (int) $_REQUEST["fdid"] : 0;
+$fd_id = $_REQUEST["fdid"];
 
-if ($fd_id <= 0) {
+if (!is_numeric($fd_id)) {
     header("Location: index.php");
-    exit;
 }
 
-$ref_id_msg = "";
 $name_msg = "";
+$ref_id_msg = "";
 $deposite_scheme_msg = "";
 $deposite_date_msg = "";
 $renewal_date_msg = "";
@@ -27,10 +30,14 @@ $rate_of_interest_msg = "";
 $interest_type_msg = "";
 $total_interest_msg = "";
 $maturity_amount_msg = "";
+$total_interest_till_date_msg = "";
+$total_amount_till_date_msg = "";
+
+$db = new db();
 
 // check for POST request
 if (isset($_POST['submit'])) {
-
+    $fd_id = $_GET['fdid'];
     require_once("validation.php");
 
     // assign post values
@@ -44,95 +51,54 @@ if (isset($_POST['submit'])) {
     $maturity_date = trim($_POST['maturity_date']);
     $deposite_amount = trim($_POST['deposite_amount']);
     $rate_of_interest = trim($_POST['rate_of_interest']);
-    $interest_type = trim($_POST['interest_type']);
+	$interest_type = trim($_POST['interest_type']);
     $total_interest = trim($_POST['total_interest']);
     $maturity_amount = trim($_POST['maturity_amount']);
-
-    /*$name_msg = "";
-    $deposite_scheme_msg = "";
-    $deposite_date_msg = "";
-    $renewal_date_msg = "";
-    $deposite_period_msg = "";
-    $maturity_date_msg = "";
-    $deposite_amount_msg = "";
-    $rate_of_interest_msg = "";
-    $total_interest_msg = "";
-    $maturity_amount_msg = "";*/
+    $total_interest_till_date = trim($_POST['total_interest_till_date']);
+    $total_amount_till_date = trim($_POST['total_amount_till_date']);
 
     $is_valid = true;
 
-    if (!is_not_empty($name)) {
-        $name_msg = "Name should be valid.";
+    if (!is_number($total_interest_till_date)) {
+        $total_interest_till_date_msg = "Total interest till date should be valid .";
         $is_valid = false;
     }
-    if (!is_not_empty($deposite_scheme)) {
-        $deposite_scheme_msg = "Please select the Deposite Scheme.";
-        $is_valid = false;
-    }
-    if (!is_valid_date($deposite_date)) {
-        $deposite_date_msg = "Deposite date should be valid.";
-        $is_valid = false;
-    }
-    if (!is_valid_date($renewal_date)) {
-        $deposite_date_msg = "Renewal date should be valid.";
-        $is_valid = false;
-    }
-    if (!is_valid_number($period)) {
-        $deposite_period_msg = "Please select the period > 0.";
-        $is_valid = false;
-    }
-    if (!is_not_empty($period_type)) {
-        if ($deposite_period_msg) {
-            $deposite_period_msg .= "<br/>Please select the period type.";
-        } else {
-            $deposite_period_msg = "Please select the period type.";
-        }
-        $is_valid = false;
-    }
-    if (!is_valid_date($maturity_date)) {
-        $maturity_date_msg = "Maturity date should be valid.";
-        $is_valid = false;
-    }
-    if (!is_valid_number($deposite_amount)) {
-        $deposite_amount_msg = "Deposite amount should be valid (and > 0).";
-        $is_valid = false;
-    }
-    if (!is_valid_number($rate_of_interest)) {
-        $rate_of_interest_msg = "ROI should be valid (and > 0).";
-        $is_valid = false;
-    }
-    if (!is_not_empty($interest_type)) {
-        $interest_type_msg = "<span class=\"error\">Please select the Interest type.</span>";
-        $is_valid = false;
-    }
-    if (!is_valid_number($total_interest)) {
-        $total_interest_msg = "Total interest should be valid (and > 0).";
-        $is_valid = false;
-    }
-    if (!is_valid_number($maturity_amount)) {
-        $maturity_amount_msg = "Maturity amount should be valid (and > 0).";
+    if (!is_valid_number($total_amount_till_date)) {
+        $total_amount_till_date_msg = "Total Maturity amount till date should be valid (and > 0).";
         $is_valid = false;
     }
 
     if ($is_valid) {
-        $name = ucwords(strtolower($name));
-        $update_fd_query = "update accounts set name=?, deposite_scheme=?, deposite_date=?, renewal_date=?, period=?, period_type=?, maturity_date=?, rate_of_interest=?, interest_type=?, deposite_amount=?, total_interest=?, maturity_amount=?, ref_id=? where id = ?";
+        $total_interest = $total_interest_till_date;
+        $maturity_amount = $total_amount_till_date;
 
-        if ($db->execute($update_fd_query, "sssssssssssssi", [$name, $deposite_scheme, $deposite_date, $renewal_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, $total_interest, $maturity_amount, $ref_id, $fd_id])) {
-            $_SESSION['msg'] = "Accounts edited successfully";
-            $_SESSION['fd_id'] = $fd_id;
-            header("Location: ./index.php");
+        if (strtotime($maturity_date) > strtotime('now')) {
+            $action = 'Prematured closed on ' . date("d-m-Y");
         } else {
-            echo "Error while updating FD details.";
+            $action = 'FD closed on ' . date("d-m-Y");
         }
+
+        $closed_date = date("Y-m-d");
+
+        $delete_query = "delete from accounts where id = '$fd_id'";
+        $rs = $db->query($delete_query);
+        $acc_history = $_SESSION['acc_history'];
+        $insert_into_acc_history = "insert into accounts_history values(null, '$fd_id', '$ref_id', '$acc_history[name]', '$acc_history[deposite_scheme]', '$acc_history[deposite_date]', '$acc_history[renewal_date]', '$acc_history[period]', '$acc_history[period_type]', '$acc_history[maturity_date]', '$acc_history[rate_of_interest]', '$acc_history[interest_type]', '$acc_history[deposite_amount]', '$total_interest', '$maturity_amount', '$action', '$closed_date')";
+        unset($_SESSION['acc_history']);
+        $db->query($insert_into_acc_history);
+
+        $_SESSION['msg'] = "FD Account is deleted successfully";
+        header("Location: index.php");
     }
 } else {
-    $fd_rs = $db->select("select * from accounts where id = ?", "i", [$fd_id]);
+    $get_fd_data = "select * from accounts where id = '$fd_id'";
 
-    if (!$fd_rs || !mysqli_num_rows($fd_rs)) {
+    $fd_rs = $db->query($get_fd_data);
+
+    if (!mysqli_num_rows($fd_rs)) {
         header("Location: index.php");
-        exit;
     }
+    include_once('ajax.php');
 
     $fd_rec = mysqli_fetch_object($fd_rs);
 
@@ -149,35 +115,63 @@ if (isset($_POST['submit'])) {
     $rate_of_interest = $fd_rec->rate_of_interest;
     $interest_type = $fd_rec->interest_type;
     $total_interest = $fd_rec->total_interest;
-    $maturity_amount = $fd_rec->maturity_amount;
+    $maturity_amount = $deposite_amount + $total_interest;
+
+    $total_interest_till_date = 0;
+    if (strtotime($maturity_date) <= strtotime('now')) {
+        // if maturity date is over
+        $total_interest_till_date = $total_interest;
+    } else {
+        $total_interest_till_date = get_current_interest_value(
+            $deposite_amount,
+            $renewal_date,
+            $maturity_date
+        );
+    }
+    $total_amount_till_date = $deposite_amount + $total_interest_till_date;
+
+    $acc_history = array (
+        'name' => $fd_rec->name,
+        'deposite_scheme' => $fd_rec->deposite_scheme,
+        'deposite_date' => $deposite_date,
+        'renewal_date' =>  $fd_rec->renewal_date,
+        'period' => $period,
+        'period_type' => $period_type,
+        'maturity_date' =>  $fd_rec->maturity_date,
+        'deposite_amount' => $fd_rec->deposite_amount,
+        'rate_of_interest' => $fd_rec->rate_of_interest,
+        'interest_type' => $fd_rec->interest_type,
+        'total_interest' => $fd_rec->total_interest,
+        'maturity_amount' => $fd_rec->maturity_amount,
+    );
+
+    // add values in session
+    $_SESSION['acc_history'] = $acc_history;
 }
 
+$page_title = "Delete FD";
+include("header.php");
 $user_rs = $db->query("select id, name from acc_users where is_active = 'y'");
 $deposite_schemes_rs = $db->query("select id, scheme_name from deposite_schemes where is_active = 'y'");
-
-$page_title = "Edit FD";
-include("header.php");
 ?>
 
 <form action="" method="post">
-<h1 align="center">Edit FD</h1>
-<table class="update_fd">
-    <tr>
+<h1 align="center">Delete FD</h1>
+<table class="delete_fd">
+    <tr >
         <th>Account ID:</th>
         <td><input type="text" name="ref_id" id="ref_id" value="<?php echo $ref_id?>" style="width:160px" /></td>
         <td><?php echo $ref_id_msg ?></td>
     </tr>
-    <tr>
+    <tr >
         <th width="120px">Name:</th>
         <td width="180px">
-            <select name="name" id="name" style="width:160px">
-                <option value=""></option>
+            <select name="name" id="name" >
                 <?php
                 while ($user_row = mysqli_fetch_object($user_rs)) {
                     if ($name == $user_row->id) {
                         echo "<option value=\"$user_row->id\" selected>$user_row->name</option>";
-                    } else {
-                        echo "<option value=\"$user_row->id\">$user_row->name</option>";
+                        break;
                     }
                 }
                 ?>
@@ -185,17 +179,15 @@ include("header.php");
         </td>
         <td width="250px"><?php echo $name_msg?></td>
     </tr>
-    <tr style="background-color:#3780B0">
+    <tr>
         <th>Deposite Scheme:</th>
         <td>
-            <select name="deposite_scheme" id="deposite_scheme" style="width:160px">
-                <option value=""></option>
+            <select name="deposite_scheme" id="deposite_scheme" style="width:160px" >
                 <?php
                     while ($ds_row = mysqli_fetch_object($deposite_schemes_rs)) {
                         if ($deposite_scheme == $ds_row->id) {
                             echo "<option value=\"$ds_row->id\" selected>$ds_row->scheme_name</option>";
-                        } else {
-                            echo "<option value=\"$ds_row->id\">$ds_row->scheme_name</option>";
+                            break;
                         }
                     }
                 ?>
@@ -203,69 +195,76 @@ include("header.php");
         </td>
         <td><?php echo $deposite_scheme_msg?></td>
     </tr>
-    <tr>
+    <tr >
         <th>Deposite Date:</th>
         <td><input type="text" name="deposite_date" id="deposite_date" value="<?php echo $deposite_date?>" readonly="readonly" style="width:140px" /></td>
         <td><?php echo $deposite_date_msg?></td>
     </tr>
-    <tr style="background-color:#3780B0">
+    <tr>
         <th>Renewal Date:</th>
         <td><input type="text" name="renewal_date" id="renewal_date" value="<?php echo $renewal_date?>" readonly="readonly" style="width:140px" /></td>
         <td><?php echo $renewal_date_msg?></td>
     </tr>
-    <tr>
+    <tr >
         <th>Period:</th>
         <td>
-            <input type="text" name="period" id="period" value="<?php echo $period?>" style="width:75px" />
+            <input type="text" name="period" id="period" value="<?php echo $period?>" style="width:75px" readonly="readonly" />
             <select name="period_type" id="period_type" style="width:80px" >
-                <option value=""></option>
-                <option value="d"<?php if ($period_type == "d") echo "selected"?>>Days</option>
-                <option value="m"<?php if ($period_type == "m") echo "selected"?>>Months</option>
-                <option value="y"<?php if ($period_type == "y") echo "selected"?>>Years</option>
+                <?php
+                    if ($period_type == "d") {
+                        echo '<option value="d" selected>Days</option>';
+                    } elseif ($period_type == "m") {
+                        echo '<option value="m" selected>Months</option>';
+                    } elseif ($period_type == "y") {
+                        echo '<option value="y" selected>Years</option>';
+                    }
+                ?>
             </select>
         </td>
         <td><?php echo $deposite_period_msg?></td>
     </tr>
-    <tr style="background-color:#3780B0">
+    <tr>
         <th>Maturity Date:</th>
         <td><input type="text" name="maturity_date" id="maturity_date" value="<?php echo $maturity_date?>" readonly="readonly" style="width:140px" /></td>
         <td><?php echo $maturity_date_msg?></td>
     </tr>
-    <tr>
+    <tr >
         <th>Deposite Amount:</th>
-        <td><input type="text" name="deposite_amount" id="deposite_amount" value="<?php echo $deposite_amount?>" style="width:160px" /></td>
+        <td><input type="text" name="deposite_amount" id="deposite_amount" value="<?php echo $deposite_amount?>" style="width:160px" readonly="readonly" /></td>
         <td><?php echo $deposite_amount_msg?></td>
     </tr>
-    <tr style="background-color:#3780B0">
+    <tr>
         <th>Rate of Interest:</th>
-        <td><input type="text" name="rate_of_interest" id="rate_of_interest" value="<?php echo $rate_of_interest?>" style="width:150px" /> %</td>
+        <td><input type="text" name="rate_of_interest" id="rate_of_interest" value="<?php echo $rate_of_interest?>" style="width:150px" readonly="readonly" /> %</td>
         <td><?php echo $rate_of_interest_msg?></td>
     </tr>
-    <tr>
-        <th>Interest Type:</th>
-        <td><select name="interest_type" id="interest_type">
-            <option value=""></option>
-            <option value="0" <?php if ($interest_type == "0") echo "selected"?>>Simple Interest</option>
-            <option value="4" <?php if ($interest_type == "4") echo "selected"?>>Compound Interest (Queartly)</option>
-            <option value="2" <?php if ($interest_type == "2") echo "selected"?>>Compound Interest (Half Yearly)</option>
-            <option value="1" <?php if ($interest_type == "1") echo "selected"?>>Compound Interest (Yearly)</option>
-            </select>
-        </td>
-        <td><?php echo $interest_type_msg?></td>
-    </tr>
-    <tr style="background-color:#3780B0">
+    <tr >
         <th>Total Interest:</th>
-        <td><input type="text" name="total_interest" id="total_interest" value="<?php echo $total_interest?>" style="width:160px" /></td>
+        <td><input type="text" name="total_interest" id="total_interest" value="<?php echo $total_interest?>" style="width:160px" readonly="readonly" /></td>
         <td><?php echo $total_interest_msg?></td>
     </tr>
     <tr>
         <th>Maturity Amount:</th>
-        <td><input type="text" name="maturity_amount" id="maturity_amount" value="<?php echo $maturity_amount?>" style="width:160px" /></td>
+        <td><input type="text" name="maturity_amount" id="maturity_amount" value="<?php echo $maturity_amount?>" style="width:160px" readonly="readonly" /></td>
         <td><?php echo $maturity_amount_msg?></td>
     </tr>
+    <tr >
+        <th>Total Interest till Date:</th>
+        <td>
+            <input type="text" name="total_interest_till_date" id="total_interest_till_date" value="<?php echo $total_interest_till_date?>" style="width:160px" />
+        </td>
+        <td><?php echo $total_interest_till_date_msg?></td>
+    </tr>
     <tr>
+        <th>Total Amount till Date:</th>
+        <td>
+            <input type="text" name="total_amount_till_date" id="total_amount_till_date" value="<?php echo $total_amount_till_date?>" style="width:160px" />
+        </td>
+        <td><?php echo $total_amount_till_date_msg?></td>
+    </tr>
+    <tr >
         <td>&nbsp;</td>
-        <td><input type="submit" name="submit" id="submit" value="Update Fix Deposite" /></td>
+        <td><input type="submit" name="submit" id="submit" value="Delete Fix Deposite" onclick="return confirm('Are you sure to delete this FD account?')" /></td>
         <td>&nbsp;</td>
     </tr>
 </table>
@@ -277,6 +276,7 @@ include("header.php");
 
 <script type="text/javascript">
     $(document).ready(function() {
+        /*
         $('#deposite_date').datepicker({
             dateFormat: 'yy-mm-dd',
             buttonImage: './media/images/calendar.gif',
@@ -295,6 +295,7 @@ include("header.php");
             buttonImageOnly: true,
             showOn: 'button'
         });
+        */
 
         $('#period').change(cal_maturity_date1);
         $('#period_type').change(cal_maturity_date1);

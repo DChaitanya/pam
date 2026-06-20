@@ -1,52 +1,72 @@
 <?php
-    require_once __DIR__ . '/auth_guard.php';
+    session_start();
+    if (!$_SESSION['is_logged']) {
+        header("Location: login.php?redirect=index");
+    }
 
-    $page_title = "Monthwise FD List";
+    $page_title = "FY Report";
     include("header.php");
     include_once("db_connect.php");
     require_once('ajax.php');
 
-    $search_query = "select a.*, s.scheme_name, a.name as name_id, u.name from accounts a inner join acc_users u on u.id = a.name inner join deposite_schemes s on a.deposite_scheme = s.id where a.is_active = 1 and s.is_active = 'y'";
+    $current_financial_year = get_current_financial_year();
+
+    $sort_link = '';
+
+    if (isset($_GET['fy']) && is_numeric($_GET['fy'])) {
+        $financial_year = trim($_GET['fy']);
+        $sort_link = "&fy=$financial_year";
+    } else {
+        $financial_year = $current_financial_year;
+    }
+
+    //echo "Current financial year is " , $current_financial_year , ' - ' , $current_financial_year+1;
+
+    $search_query = "
+    select ah.*, au.name, s.scheme_name
+    from accounts_history ah
+    inner join acc_users au on ah.name = au.id
+    inner join deposite_schemes s on ah.deposite_scheme = s.id
+    where (
+        (ah.maturity_date between '". $financial_year ."-04-01' and '". ($financial_year+1) ."-03-31' and ah.closed_date is null)
+        or ah.closed_date between '". $financial_year ."-04-01' and '". ($financial_year+1) ."-03-31'
+    )";
+    //echo $search_query;
 
     $name = '';
     $deposite_scheme = '';
     $deposited_on = '';
     $matured_on = '';
 
-    $sort_link = '';
-
     if (isset($_GET['name']) && $_GET['name']) {
-        $name = (int) trim($_GET['name']); // integer-validated (S1)
+        $name = trim($_GET['name']);
         $search_query .= " and a.name = $name";
         $sort_link .= "&name=$name";
     }
     if (isset($_GET['deposite_scheme']) && $_GET['deposite_scheme']) {
-        $deposite_scheme = (int) trim($_GET['deposite_scheme']); // integer-validated (S1)
+        $deposite_scheme = trim($_GET['deposite_scheme']);
         $search_query .= " and deposite_scheme = '$deposite_scheme'";
         $sort_link .= "&deposite_scheme=$deposite_scheme";
     }
     if (isset($_GET['deposited_on']) && $_GET['deposited_on']) {
-        $deposited_on = (int) trim($_GET['deposited_on']); // integer-validated (S1)
+        $deposited_on = trim($_GET['deposited_on']);
         $search_query .= " and (month(deposite_date) = '$deposited_on' or month(renewal_date) = '$deposited_on')";
         $sort_link .= "&deposited_on=$deposited_on";
     }
     if (isset($_GET['matured_on']) && $_GET['matured_on']) {
-        $matured_on = (int) trim($_GET['matured_on']); // integer-validated (S1)
+        $matured_on = trim($_GET['matured_on']);
         $search_query .= " and month(maturity_date) = '$matured_on'";
         $sort_link .= "&matured_on=$matured_on";
     }
 
-    $order_by = 'maturity_date';
+    $order_by = '';
     $ord = 0;
     if (isset($_GET['ord'])) {
-        $ord = (int) $_GET['ord'];
+        $ord = $_GET['ord'];
 
         switch ($ord) {
-            default:
+            case 0:
                 $order_by = 'maturity_date';
-                break;
-            case 1:
-                $order_by = 'u.name';
                 break;
             case 2:
                 $order_by = 'deposite_scheme';
@@ -72,6 +92,9 @@
             case 9:
                 $order_by = 'maturity_amount';
                 break;
+            case 10:
+                $order_by = 'account_id';
+                break;
         }
     }
 
@@ -79,7 +102,7 @@
     $ot = 1;
     $new_ot = 1;
     if (isset($_GET['ot'])) {
-        $ot = (int) $_GET['ot'];
+        $ot = $_GET['ot'];
 
         if ($ot == 0) {
             $order_type = 'desc';
@@ -89,8 +112,13 @@
         }
     }
 
-    $search_query .= " order by $order_by $order_type";
+    if ($order_by) {
+        $search_query .= " order by ah.name asc, $order_by $order_type, maturity_date asc";
+    } else {
+        $search_query .= " order by ah.name asc, maturity_date asc";
+    }
 
+    //echo $search_query;
     $db = new db();
     $rs = $db->query($search_query);
     if ($rs === false) {
@@ -99,33 +127,31 @@
         $total_results = mysqli_num_rows($rs);
     }
 
-    $monthwise_fd_list = array();
+    $namewise_fd_list = array();
 
     while ($row = mysqli_fetch_object($rs)) {
-        $monthwise_fd_list[date('Y-m', strtotime($row->maturity_date))][] = $row;
+        $namewise_fd_list[$row->name][] = $row;
     }
-
-    //print_r(array_keys($monthwise_fd_list));
-    ksort($monthwise_fd_list);
-    //print_r(array_keys($monthwise_fd_list));
 ?>
 
 <table class="fd-list">
     <tr>
-        <th rowspan="2" width="20px">#</th>
-        <th rowspan="2" width="190px">
-            <a href="?<?php echo$sort_link?>&ord=1&ot=<?php echo $ord == 1?$new_ot:$ot?>">Name</a>
-            <?php
-                if ($ord == 1) {
-                    if ($ot == 1) {
-                        echo '&nbsp;<img height="10px" src="./media/images/asc.png"/>';
-                    } else {
-                        echo '&nbsp;<img height="10px" src="./media/images/desc.png"/>';
-                    }
-                }
-            ?>
-        </th>
-        <th rowspan="2" width="70px">
+        <td colspan="12">
+            <form action="" method="GET" id="search_frm"><strong>FD Report for Financial Year:</strong>
+                <select name="fy">
+                    <option value="<?php echo $current_financial_year ?>" <?php if ($financial_year == $current_financial_year) echo "selected"?>><?php echo $current_financial_year, '-', $current_financial_year+1 ?></option>
+                    <option value="<?php echo $current_financial_year-1 ?>" <?php if ($financial_year == $current_financial_year-1) echo "selected"?>><?php echo $current_financial_year-1, '-', $current_financial_year ?></option>
+                    <option value="<?php echo $current_financial_year-2 ?>" <?php if ($financial_year == $current_financial_year-2) echo "selected"?>><?php echo $current_financial_year-2, '-', $current_financial_year-1 ?></option>
+                </select>
+                <input type="submit" name="submit" value="Submit" />
+                <input type="hidden" name="ord" value="<?php echo $ord?>" />
+                <input type="hidden" name="ot" value="<?php echo $ot?>" />
+            </form>
+        </td>
+    </tr>
+    <tr>
+        <th rowspan="2" width="60px">#</th>
+        <th rowspan="2" width="120px">
             <a href="?<?php echo$sort_link?>&ord=2&ot=<?php echo $ord == 2?$new_ot:$ot?>">Deposited In</a>
             <?php
                 if ($ord == 2) {
@@ -137,7 +163,20 @@
                 }
             ?>
         </th>
-        <th rowspan="2" width="75px">
+        <th rowspan="2" width="180px">
+            <a href="?<?php echo$sort_link?>&ord=10&ot=<?php echo $ord == 10?$new_ot:$ot?>">Account #</a>
+            <?php
+                if ($ord == 10) {
+                    if ($ot == 1) {
+                        echo '&nbsp;<img height="10px" src="./media/images/asc.png"/>';
+                    } else {
+                        echo '&nbsp;<img height="10px" src="./media/images/desc.png"/>';
+                    }
+                }
+            ?>
+        </th>
+        <th colspan="3">Dates</th>
+        <th rowspan="2" width="100px">
             <a href="?<?php echo$sort_link?>&ord=3&ot=<?php echo $ord == 3?$new_ot:$ot?>">Period</a>
             <?php
                 if ($ord == 3) {
@@ -149,8 +188,7 @@
                 }
             ?>
         </th>
-        <th colspan="3">Dates</th>
-        <th rowspan="2" width="50px">
+        <th rowspan="2" width="100px">
             <a href="?<?php echo$sort_link?>&ord=6&ot=<?php echo $ord == 6?$new_ot:$ot?>">ROI</a>
             <?php
                 if ($ord == 6) {
@@ -162,11 +200,11 @@
                 }
             ?>
         </th>
-        <th colspan="5">Amount</th>
-        <th width="150px">Actions</th>
+        <th colspan="3">Amount</th>
+        <th>Remark</th>
     </tr>
     <tr>
-        <th width="80px">
+        <th width="100px">
             <a href="?<?php echo$sort_link?>&ord=4&ot=<?php echo $ord == 4?$new_ot:$ot?>">Deposite</a>
             <?php
                 if ($ord == 4) {
@@ -178,7 +216,7 @@
                 }
             ?>
         </th>
-        <th width="80px">
+        <th width="100px">
             <a href="?<?php echo$sort_link?>&ord=5&ot=<?php echo $ord == 5?$new_ot:$ot?>">Renewal</a>
             <?php
                 if ($ord == 5) {
@@ -190,7 +228,7 @@
                 }
             ?>
         </th>
-        <th width="80px">
+        <th width="100px">
             <a href="?<?php echo$sort_link?>&ord=0&ot=<?php echo $ord == 0?$new_ot:$ot?>">Maturity</a>
             <?php
                 if ($ord == 0) {
@@ -202,7 +240,7 @@
                 }
             ?>
         </th>
-        <th width="65px">
+        <th width="100px">
             <a href="?<?php echo$sort_link?>&ord=7&ot=<?php echo $ord == 7?$new_ot:$ot?>">Deposite</a>
             <?php
                 if ($ord == 7) {
@@ -214,7 +252,7 @@
                 }
             ?>
         </th>
-        <th width="65px">
+        <th width="100px">
             <a href="?<?php echo$sort_link?>&ord=8&ot=<?php echo $ord == 8?$new_ot:$ot?>">Interest</a>
             <?php
                 if ($ord == 8) {
@@ -226,9 +264,7 @@
                 }
             ?>
         </th>
-        <th width="65px">Cur Int</th>
-        <th width="65px">Cur Value</th>
-        <th width="65px">
+        <th width="100px">
             <a href="?<?php echo$sort_link?>&ord=9&ot=<?php echo $ord == 9?$new_ot:$ot?>">Maturity</a>
             <?php
                 if ($ord == 9) {
@@ -247,20 +283,18 @@
     $total_deposite_amount = 0;
     $total_interest_amount = 0;
     $total_matured_amount = 0;
-    $total_cur_interest_amount = 0;
-    $total_cur_value = 0;
 
     if (!$total_results) {
 ?>
         <tr class="even">
-            <th colspan="13">Results are not found.</th>
+            <th colspan="12">Results are not found.</th>
         </tr>
 <?php
     } else {
         $block = 1;
-        foreach ($monthwise_fd_list as $fd_name=>$fd_list) {
+        foreach ($namewise_fd_list as $fd_name=>$fd_list) {
             echo '<tr>';
-            echo '<td colspan="13" ><strong>' . date('Y, F  ', strtotime($fd_name)) .'</strong></td>';
+            echo '<td colspan="11" ><strong>' . $fd_name .'</strong></td>';
             echo '<td><a class="toggle_blocks" onclick="show_hide_block('.$block.')" href="javascript:void(0)">Show/Hide details</a></td>';
             echo '</tr>';
 
@@ -281,24 +315,23 @@
                 $namewise_interest_amount += $row->total_interest;
                 $namewise_matured_amount += $row->maturity_amount;
 
-                if (strtotime($row->maturity_date) <= strtotime('now')) {
-                    $renew_txt = '<a href="renew_fd.php?fdid='.$row->id.'">Renew</a> |';
-                    $show_renew_alert = true;
-                } else {
-                    $show_renew_alert = false;
-                    $renew_txt = 'Renew |';
-                }
 ?>
-                <tr class="<?php
-                    if ($show_renew_alert) {
-                        echo 'renew';
-                    } else {
-                        if ($sr_no % 2) { echo 'odd'; } else { echo 'even'; }
-                    }
-                ?> block_<?php echo $block ?>">
-                <td align="right"><?php echo $sr_no++;?></td>
-                <td align="right"><?php echo $row->name ?></td>
-                <td align="left"><?php echo $row->scheme_name;?></td>
+                <tr class="<?php echo $sr_no % 2? 'odd' : 'even'; ?> block_<?php echo $block ?>">
+                <td align="right"><?php echo $sr_no++; ?></td>
+                <td align="left"><?php echo $row->scheme_name; ?></td>
+                <td align="right">
+                	<?php
+                		if ($row->ref_id) {
+                			echo $row->ref_id;
+                		} else {
+                			printf("%08d", $row->account_id);
+                		}
+                	?>
+                </td>
+
+                <td align="right"><?php echo date("d-m-Y", strtotime($row->deposite_date)) ?></td>
+                <td align="right"><?php echo date("d-m-Y", strtotime($row->renewal_date)) ?></td>
+                <td align="right"><?php echo date("d-m-Y", strtotime($row->maturity_date)) ?></td>
                 <td align="right">
                     <?php echo $row->period?>
                     <?php   if ($row->period_type == 'd') {
@@ -310,52 +343,20 @@
                             }
                     ?>
                 </td>
-                <td align="right"><?php echo date("d-m-Y", strtotime($row->deposite_date)) ?></td>
-                <td align="right"><?php echo date("d-m-Y", strtotime($row->renewal_date)) ?></td>
-                <td align="right"><?php echo date("d-m-Y", strtotime($row->maturity_date)) ?></td>
-                <td align="right"><?php echo number_format($row->rate_of_interest, 2)?>%</td>
-                <td align="right"><?php echo number_format($row->deposite_amount, 2) ?></td>
-                <td align="right"><?php echo number_format($row->total_interest, 2) ?></td>
-                <td align="right">
-                    <?php
-                        if (strtotime($row->maturity_date) <= strtotime('now')) {
-                            // if maturity date is over
-                            $int_till_date = $row->total_interest;
-                        } else {
-                            $int_till_date = get_current_interest_value(
-                                $row->deposite_amount,
-                                $row->renewal_date,
-                                $row->maturity_date
-                            );
-                        }
-                        echo number_format($int_till_date, 2);
-                        $total_cur_interest_amount += $int_till_date;
-                        $namewise_cur_interest_amount += $int_till_date;
-                    ?>
-                </td>
-                <td align="right">
-                    <?php
-                        $cur_value = $row->deposite_amount + $int_till_date;
-                        $total_cur_value += $cur_value;
-                        $namewise_cur_value += $cur_value;
-                        echo number_format($cur_value, 2);
-                    ?>
-                </td>
-                <td align="right"><?php echo number_format($row->maturity_amount, 2) ?></td>
-                <td align="left">
-                    <?php echo $renew_txt ?> <a href="edit_fd.php?fdid=<?php echo $row->id?>">Edit</a> | <a href="delete_fd.php?fdid=<?php echo $row->id?>" onclick="return confirm('Are you sure to delete this FD?')">Delete</a>
-                </td>
+                <td align="right"><?php echo $fmt->format($row->rate_of_interest)?>%</td>
+                <td align="right"><?php echo $fmt->format($row->deposite_amount) ?></td>
+                <td align="right"><?php echo $fmt->format($row->total_interest) ?></td>
+                <td align="right"><?php echo $fmt->format($row->maturity_amount) ?></td>
+                <td align="left"><?php echo ucfirst($row->action); ?></td>
             </tr>
 <?php
             }
 ?>
             <tr>
                 <th colspan="8">Total</th>
-                <th align="right"><?php echo number_format($namewise_deposite_amount, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_interest_amount, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_cur_interest_amount, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_cur_value, 2) ?></th>
-                <th align="right"><?php echo number_format($namewise_matured_amount, 2)?></th>
+                <th align="right"><?php echo $fmt->format($namewise_deposite_amount) ?></th>
+                <th align="right"><?php echo $fmt->format($namewise_interest_amount) ?></th>
+                <th align="right"><?php echo $fmt->format($namewise_matured_amount)?></th>
                 <th>&nbsp;</th>
             </tr>
 <?php
@@ -365,11 +366,9 @@
 ?>
     <tr>
         <th colspan="8">Final Total</th>
-        <th align="right"><?php echo number_format($total_deposite_amount, 2) ?></th>
-        <th align="right"><?php echo number_format($total_interest_amount, 2) ?></th>
-        <th align="right"><?php echo number_format($total_cur_interest_amount, 2) ?></th>
-        <th align="right"><?php echo number_format($total_cur_value, 2) ?></th>
-        <th align="right"><?php echo number_format($total_matured_amount, 2)?></th>
+        <th align="right"><?php echo $fmt->format($total_deposite_amount) ?></th>
+        <th align="right"><?php echo $fmt->format($total_interest_amount) ?></th>
+        <th align="right"><?php echo $fmt->format($total_matured_amount)?></th>
         <th>&nbsp;</th>
     </tr>
 </table>

@@ -1,18 +1,16 @@
 <?php
-    session_start();
-    if (!$_SESSION['is_logged']) {
-        header("Location: login.php?redirect=renew_fd");
-    }
+    require_once __DIR__ . '/auth_guard.php';
     // set the default timezone as 'Asia/Calcutta';
     date_default_timezone_set('Asia/Kolkata');
 
     include_once("db_connect.php");
     $db = new db();
 
-    $fd_id = $_REQUEST["fdid"];
+    $fd_id = isset($_REQUEST["fdid"]) ? (int) $_REQUEST["fdid"] : 0;
 
-    if (!is_numeric($fd_id)) {
+    if ($fd_id <= 0) {
         header("Location: index.php");
+        exit;
     }
 
     $ref_id_msg = "";
@@ -105,30 +103,31 @@
 
         if ($is_valid) {
             $name = ucwords(strtolower($name));
-            $update_fd_query = "update accounts set name='$name', deposite_scheme='$deposite_scheme', deposite_date='$deposite_date', renewal_date='$renewal_date', period='$period', period_type='$period_type', maturity_date='$maturity_date', rate_of_interest='$rate_of_interest', interest_type='$interest_type', deposite_amount='$deposite_amount', total_interest='$total_interest', maturity_amount='$maturity_amount', ref_id='$ref_id' where id = '$fd_id'";
+            $update_fd_query = "update accounts set name=?, deposite_scheme=?, deposite_date=?, renewal_date=?, period=?, period_type=?, maturity_date=?, rate_of_interest=?, interest_type=?, deposite_amount=?, total_interest=?, maturity_amount=?, ref_id=? where id = ?";
 
             $action = 'renewed on ' . date("d-m-Y");
 
-            if ($db->query($update_fd_query)) {
+            if ($db->execute($update_fd_query, "sssssssssssssi", [$name, $deposite_scheme, $deposite_date, $renewal_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, $total_interest, $maturity_amount, $ref_id, $fd_id])) {
                 $acc_history = $_SESSION['acc_history'];
-                $insert_into_acc_history = "insert into accounts_history values(null, '$fd_id', '$ref_id', '$acc_history[name]', '$acc_history[deposite_scheme]', '$acc_history[deposite_date]', '$acc_history[renewal_date]', '$acc_history[period]', '$acc_history[period_type]', '$acc_history[maturity_date]', '$acc_history[rate_of_interest]', '$acc_history[interest_type]', '$acc_history[deposite_amount]', '$acc_history[total_interest]', '$acc_history[maturity_amount]', '$action', null)";
+                $insert_into_acc_history = "insert into accounts_history values(null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null)";
 
-                $db->query($insert_into_acc_history);
+                $db->execute($insert_into_acc_history, "issssssssssssss", [$fd_id, $ref_id, $acc_history['name'], $acc_history['deposite_scheme'], $acc_history['deposite_date'], $acc_history['renewal_date'], $acc_history['period'], $acc_history['period_type'], $acc_history['maturity_date'], $acc_history['rate_of_interest'], $acc_history['interest_type'], $acc_history['deposite_amount'], $acc_history['total_interest'], $acc_history['maturity_amount'], $action]);
 
                 $_SESSION['msg'] = "Accounts renewed successfully";
                 $_SESSION['fd_id'] = $fd_id;
                 //exit(0);
                 header("Location: ./index.php");
+                exit;
             } else {
                 echo "Error while updating FD details.";
             }
         }
     } else {
-        $get_fd_data = "select * from accounts where id = '$fd_id' and `maturity_date` <= curdate()";
-        $fd_rs = $db->query($get_fd_data);
+        $fd_rs = $db->select("select * from accounts where id = ? and `maturity_date` <= curdate()", "i", [$fd_id]);
 
-        if (!mysqli_num_rows($fd_rs)) {
+        if (!$fd_rs || !mysqli_num_rows($fd_rs)) {
             header("Location: index.php");
+            exit;
         }
         include_once('ajax.php');
 

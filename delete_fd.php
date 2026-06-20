@@ -1,9 +1,6 @@
 <?php
 
-session_start();
-if (!$_SESSION['is_logged']) {
-    header("Location: login.php?redirect=delete_fd");
-}
+require_once __DIR__ . '/auth_guard.php';
 // set the default timezone as 'Asia/Calcutta';
 date_default_timezone_set('Asia/Kolkata');
 
@@ -12,10 +9,11 @@ include_once("db_connect.php");
 
 $db = new db();
 
-$fd_id = $_REQUEST["fdid"];
+$fd_id = isset($_REQUEST["fdid"]) ? (int) $_REQUEST["fdid"] : 0;
 
-if (!is_numeric($fd_id)) {
+if ($fd_id <= 0) {
     header("Location: index.php");
+    exit;
 }
 
 $name_msg = "";
@@ -37,7 +35,7 @@ $db = new db();
 
 // check for POST request
 if (isset($_POST['submit'])) {
-    $fd_id = $_GET['fdid'];
+    $fd_id = isset($_REQUEST['fdid']) ? (int) $_REQUEST['fdid'] : 0;
     require_once("validation.php");
 
     // assign post values
@@ -80,23 +78,27 @@ if (isset($_POST['submit'])) {
 
         $closed_date = date("Y-m-d");
 
-        $delete_query = "delete from accounts where id = '$fd_id'";
-        $rs = $db->query($delete_query);
-        $acc_history = $_SESSION['acc_history'];
-        $insert_into_acc_history = "insert into accounts_history values(null, '$fd_id', '$ref_id', '$acc_history[name]', '$acc_history[deposite_scheme]', '$acc_history[deposite_date]', '$acc_history[renewal_date]', '$acc_history[period]', '$acc_history[period_type]', '$acc_history[maturity_date]', '$acc_history[rate_of_interest]', '$acc_history[interest_type]', '$acc_history[deposite_amount]', '$total_interest', '$maturity_amount', '$action', '$closed_date')";
-        unset($_SESSION['acc_history']);
-        $db->query($insert_into_acc_history);
+        $insert_into_acc_history = "insert into accounts_history values(null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        $_SESSION['msg'] = "FD Account is deleted successfully";
-        header("Location: index.php");
+        $rs = $db->execute($insert_into_acc_history, "isssssssssssssss", [$fd_id, $ref_id, $name, $deposite_scheme, $deposite_date, $renewal_date, $period, $period_type, $maturity_date, $rate_of_interest, $interest_type, $deposite_amount, $total_interest, $maturity_amount, $action, $closed_date]);
+        if ($rs == false) {
+            print("Error while inserting into accounts_history");
+            print ("Please fix sql query before proceeding again.");
+        } else {
+            $delete_query = "delete from accounts where id = ?";
+            $rs = $db->execute($delete_query, "i", [$fd_id]);
+
+            $_SESSION['msg'] = "FD Account is deleted successfully";
+            header("Location: index.php");
+            exit;
+        }
     }
 } else {
-    $get_fd_data = "select * from accounts where id = '$fd_id'";
+    $fd_rs = $db->select("select * from accounts where id = ?", "i", [$fd_id]);
 
-    $fd_rs = $db->query($get_fd_data);
-
-    if (!mysqli_num_rows($fd_rs)) {
+    if (!$fd_rs || !mysqli_num_rows($fd_rs)) {
         header("Location: index.php");
+        exit;
     }
     include_once('ajax.php');
 
@@ -130,23 +132,23 @@ if (isset($_POST['submit'])) {
     }
     $total_amount_till_date = $deposite_amount + $total_interest_till_date;
 
-    $acc_history = array (
-        'name' => $fd_rec->name,
-        'deposite_scheme' => $fd_rec->deposite_scheme,
-        'deposite_date' => $deposite_date,
-        'renewal_date' =>  $fd_rec->renewal_date,
-        'period' => $period,
-        'period_type' => $period_type,
-        'maturity_date' =>  $fd_rec->maturity_date,
-        'deposite_amount' => $fd_rec->deposite_amount,
-        'rate_of_interest' => $fd_rec->rate_of_interest,
-        'interest_type' => $fd_rec->interest_type,
-        'total_interest' => $fd_rec->total_interest,
-        'maturity_amount' => $fd_rec->maturity_amount,
-    );
+    // $acc_history = array (
+    //     'name' => $fd_rec->name,
+    //     'deposite_scheme' => $fd_rec->deposite_scheme,
+    //     'deposite_date' => $deposite_date,
+    //     'renewal_date' =>  $fd_rec->renewal_date,
+    //     'period' => $period,
+    //     'period_type' => $period_type,
+    //     'maturity_date' =>  $fd_rec->maturity_date,
+    //     'deposite_amount' => $fd_rec->deposite_amount,
+    //     'rate_of_interest' => $fd_rec->rate_of_interest,
+    //     'interest_type' => $fd_rec->interest_type,
+    //     'total_interest' => $fd_rec->total_interest,
+    //     'maturity_amount' => $fd_rec->maturity_amount,
+    // );
 
     // add values in session
-    $_SESSION['acc_history'] = $acc_history;
+    // $_SESSION['acc_history'] = $acc_history;
 }
 
 $page_title = "Delete FD";
@@ -240,7 +242,10 @@ $deposite_schemes_rs = $db->query("select id, scheme_name from deposite_schemes 
     </tr>
     <tr >
         <th>Total Interest:</th>
-        <td><input type="text" name="total_interest" id="total_interest" value="<?php echo $total_interest?>" style="width:160px" readonly="readonly" /></td>
+        <td>
+            <input type="text" name="total_interest" id="total_interest" value="<?php echo $total_interest?>" style="width:160px" readonly="readonly" />
+            <input type="hidden" name="interest_type" id="interest_type" value="<?php echo $interest_type?>"  />
+        </td>
         <td><?php echo $total_interest_msg?></td>
     </tr>
     <tr>

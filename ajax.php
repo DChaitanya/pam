@@ -4,6 +4,11 @@
 date_default_timezone_set('UTC');
 
 if (isset($_GET['action'])) {
+	// Direct AJAX calls require an authenticated session (finding S4). Pages that
+	// merely include this file for its helper functions do not pass ?action and
+	// therefore skip this guard.
+	require_once __DIR__ . '/auth_guard.php';
+
 	if ($_GET['action'] == 'cal_maturity_date') {
 
 		$deposite_date = $_REQUEST['deposite_date'];

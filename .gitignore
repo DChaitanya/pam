@@ -1,0 +1,33 @@
+# ── Runtime logs (contain logged SQL / may grow large) ──
+query_log.txt
+search_query_log.txt
+error_log.txt
+login_log.txt
+*.log
+
+# ── Secrets / local config ──
+.env
+.env.*
+!.env.example
+config.local.php
+db_config.local.php
+
+# ── Database dumps & backups (keep schema in /db, ignore ad-hoc dumps) ──
+backups/
+*.sql.gz
+*.dump
+
+# ── Editor / IDE ──
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# ── PHP / dependencies ──
+vendor/
+composer.phar
+
+# ── Legacy backup copies (kept on disk for now, not tracked) ──
+*.orig
