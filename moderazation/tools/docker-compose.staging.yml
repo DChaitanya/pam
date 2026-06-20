@@ -1,0 +1,55 @@
+# PAM — local staging environment that mirrors production (PHP + MySQL).
+#
+# Purpose (Phase 0): a throwaway, reproducible copy of the live app so the
+# modernization work can be validated without touching production.
+#
+# Usage:
+#   1) Put a production dump at ./backups/pam_latest.sql  (gunzip your backup)
+#   2) docker compose -f tools/docker-compose.staging.yml up -d
+#   3) App:   http://localhost:8080
+#      Adminer (DB UI): http://localhost:8081
+#
+# NOTE: credentials below are for LOCAL STAGING ONLY. Never reuse in production.
+
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: staging_root_pw
+      MARIADB_DATABASE: pam
+      MARIADB_USER: pam_app
+      MARIADB_PASSWORD: staging_app_pw
+    volumes:
+      # Any .sql/.sql.gz here is auto-imported on first boot:
+      - ../backups:/docker-entrypoint-initdb.d:ro
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: php:8.3-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount the legacy app read-only; override db_connect via env in Phase 1.
+      - ../:/var/www/html:ro
+    ports:
+      - "8080:80"
+    command: >
+      bash -c "docker-php-ext-install mysqli && apache2-foreground"
+
+  adminer:
+    image: adminer:4
+    depends_on:
+      - db
+    ports:
+      - "8081:8080"
+
+volumes:
+  db_data:
